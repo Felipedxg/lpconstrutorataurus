@@ -1,0 +1,102 @@
+# ============================================================
+#  Taurus Construtora — .htaccess (hardened)
+# ============================================================
+
+# --- Forçar HTTPS -------------------------------------------
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# --- Remover www ---------------------------------------------
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+# --- Bloqueia acesso à pasta tmp/ ----------------------------
+RewriteRule ^tmp/ - [F,L]
+
+# --- Bloqueia arquivos sensíveis direto ----------------------
+RewriteRule ^(screenshot\.js|package\.json|package-lock\.json|node_modules/) - [F,L]
+
+# --- Bloqueia extensões perigosas ----------------------------
+<FilesMatch "\.(env|log|sql|bak|backup|sh|bash|git|yml|yaml|config|ini|htpasswd)$">
+  Require all denied
+</FilesMatch>
+
+# --- Bloqueia injeção via query string -----------------------
+RewriteCond %{QUERY_STRING} (<|%3C).*script.*(>|%3E)     [NC,OR]
+RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [NC,OR]
+RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2}) [NC,OR]
+RewriteCond %{QUERY_STRING} base64_(en|de)code[^(]*\(     [NC,OR]
+RewriteCond %{QUERY_STRING} (\.\./|\.\.%2F|%2E%2E%2F)    [NC,OR]
+RewriteCond %{QUERY_STRING} (union.*select|select.*from)  [NC,OR]
+RewriteCond %{QUERY_STRING} (insert|update|delete|drop)\s+[a-z] [NC,OR]
+RewriteCond %{QUERY_STRING} \beval\b                       [NC,OR]
+RewriteCond %{QUERY_STRING} (wget|curl|fetch)\s           [NC]
+RewriteRule .* - [F,L]
+
+# --- Bloqueia User-Agents de scanners / bots maliciosos ------
+RewriteCond %{HTTP_USER_AGENT} (nikto|sqlmap|nmap|masscan|zmeu|dirbuster|metasploit|nessus|openvas|acunetix|w3af|burpsuite) [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} (havij|pangolin|webscan|webshag|paros|brutus|hydra|medusa)   [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} (python-requests|go-http-client|libwww-perl|curl/7\.[0-4])  [NC]
+RewriteRule .* - [F,L]
+
+# --- Bloqueia POST em arquivos que não sejam mail.php --------
+RewriteCond %{REQUEST_METHOD} POST
+RewriteCond %{REQUEST_URI} !^/mail\.php$ [NC]
+RewriteRule ^(?!mail\.php).+\.(php|phtml|php3|php4|php5|phar)$ - [F,L]
+
+# --- Protege arquivos de sistema -----------------------------
+<Files ".htaccess">
+  Require all denied
+</Files>
+<Files "mail.php">
+  <LimitExcept POST>
+    Require all denied
+  </LimitExcept>
+</Files>
+
+# --- Headers de segurança -----------------------------------
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+  # Content Security Policy
+  Header always set Content-Security-Policy "\
+    default-src 'self'; \
+    script-src 'self'; \
+    style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; \
+    font-src 'self' https://fonts.gstatic.com; \
+    img-src 'self' data:; \
+    connect-src 'self'; \
+    frame-ancestors 'none'; \
+    base-uri 'self'; \
+    form-action 'self';"
+
+  # Remove header que revela tecnologia
+  Header unset X-Powered-By
+  Header always unset Server
+</IfModule>
+
+# --- Cache de assets estáticos ------------------------------
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png          "access plus 1 month"
+  ExpiresByType image/jpeg         "access plus 1 month"
+  ExpiresByType image/webp         "access plus 1 month"
+  ExpiresByType text/css           "access plus 1 week"
+  ExpiresByType application/javascript "access plus 1 week"
+  ExpiresByType image/x-icon       "access plus 1 year"
+</IfModule>
+
+# --- Compressão Gzip ----------------------------------------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript
+  AddOutputFilterByType DEFLATE image/svg+xml application/json
+</IfModule>
+
+# --- Bloqueia listagem de diretórios ------------------------
+Options -Indexes -ExecCGI
