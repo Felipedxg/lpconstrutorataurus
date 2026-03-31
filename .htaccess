@@ -49,11 +49,6 @@ RewriteRule ^(?!mail\.php).+\.(php|phtml|php3|php4|php5|phar)$ - [F,L]
 <Files ".htaccess">
   Require all denied
 </Files>
-<Files "mail.php">
-  <LimitExcept POST>
-    Require all denied
-  </LimitExcept>
-</Files>
 
 # --- Headers de segurança -----------------------------------
 <IfModule mod_headers.c>
